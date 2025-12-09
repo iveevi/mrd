@@ -1,5 +1,9 @@
 #pragma once
 
+#include <bit>
+#include <cstddef>
+#include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 #include <filesystem>
@@ -93,6 +97,22 @@ struct float3_32b {
 	glm::float32_t x;
 	glm::float32_t y;
 	glm::float32_t z;
+
+	constexpr bool operator==(const float3_32b &rhs) const noexcept {
+		return std::bit_cast <uint32_t> (x) == std::bit_cast <uint32_t> (rhs.x)
+		    && std::bit_cast <uint32_t> (y) == std::bit_cast <uint32_t> (rhs.y)
+		    && std::bit_cast <uint32_t> (z) == std::bit_cast <uint32_t> (rhs.z);
+	}
+
+	static size_t hash(const float3_32b &p) noexcept {
+		const auto bx = std::bit_cast <uint32_t> (p.x);
+		const auto by = std::bit_cast <uint32_t> (p.y);
+		const auto bz = std::bit_cast <uint32_t> (p.z);
+		return (static_cast <size_t> (bx) * 0x1f1f1f1fu)
+		     ^ (static_cast <size_t> (by) * 0x3b3b3b3bu)
+		     ^ (static_cast <size_t> (bz) * 0x5f5f5f5fu);
+	}
+
 };
 
 struct float4_32b {
@@ -179,6 +199,74 @@ struct Mesh {
 
 	std::vector <primitive_t> primitives;
 
+	size_t size_bytes() const {
+		size_t result = sizeof(position_t) * positions.size();
+		if constexpr (F.normals != encodings::S2::Disable)
+			result += sizeof(normal_t) * normals.size();
+		if constexpr (F.uvs != encodings::R2::Disable)
+			result += sizeof(uv_t) * uvs.size();
+
+		result += sizeof(primitive_t) * primitives.size();
+		return result;
+	}
+
+	// TODO: later add flag parameters for more than positions?
+	void deduplicate() {
+		if (positions.empty())
+			return;
+
+		auto hash = [](const position_t &p) noexcept {
+			return position_t::hash(p);
+		};
+
+		auto eq = [](const position_t &a, const position_t &b) noexcept {
+			return a == b;
+		};
+
+		std::unordered_map <position_t, size_t, decltype(hash), decltype(eq)> remap(
+			positions.size(), hash, eq
+		);
+
+		constexpr bool has_normals = F.normals != encodings::S2::Disable;
+		constexpr bool has_uvs = F.uvs != encodings::R2::Disable;
+
+		std::vector <position_t> new_positions;
+		new_positions.reserve(positions.size());
+
+		decltype(normals) new_normals;
+		if constexpr (has_normals)
+			new_normals.reserve(normals.size());
+
+		decltype(uvs) new_uvs;
+		if constexpr (has_uvs)
+			new_uvs.reserve(uvs.size());
+
+		auto get_or_insert = [&](size_t idx) -> size_t {
+			const auto &p = positions[idx];
+			auto [it, inserted] = remap.try_emplace(p, new_positions.size());
+			if (inserted) {
+				new_positions.push_back(p);
+				if constexpr (has_normals)
+					new_normals.push_back(normals[idx]);
+				if constexpr (has_uvs)
+					new_uvs.push_back(uvs[idx]);
+			}
+			return it->second;
+		};
+
+		for (auto &prim : primitives) {
+			prim.x = static_cast <decltype(prim.x)> (get_or_insert(prim.x));
+			prim.y = static_cast <decltype(prim.y)> (get_or_insert(prim.y));
+			prim.z = static_cast <decltype(prim.z)> (get_or_insert(prim.z));
+		}
+
+		positions = std::move(new_positions);
+		if constexpr (has_normals)
+			normals = std::move(new_normals);
+		if constexpr (has_uvs)
+			uvs = std::move(new_uvs);
+	}
+
 	// TODO: methods: deduplication, conversion, etc.
 };
 
@@ -213,6 +301,13 @@ struct Model {
 
 	std::vector <mesh_t> meshes;
 	// TODO: all the materials as well
+
+	size_t size_bytes() const {
+		size_t result = 0;
+		for (const auto &mesh : meshes)
+			result += mesh.size_bytes();
+		return result;
+	}
 
 	// TODO: for loading, we require a triangle primitive
 	static Model load(const std::filesystem::path &path) {
