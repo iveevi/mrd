@@ -59,7 +59,6 @@ void assimp_load(const AssimpCallbacks &callbacks, const std::filesystem::path &
 	auto scene = importer.ReadFile(
 		path,
 		aiProcess_Triangulate
-		| aiProcess_GenNormals
 		| aiProcess_FlipUVs
 	);
 
