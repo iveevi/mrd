@@ -15,11 +15,11 @@
 namespace mrd {
 
 // Forward declarations
-template <TextureEncoding E>
+template <Pixel P>
 struct Texture;
 
-using CanonicalLDR = Texture <TextureEncoding::RGBA_UNorm8>;
-using CanonicalHDR = Texture <TextureEncoding::RGBA_Srgb32>;
+using CanonicalLDR = Texture <Pixel::RGBA_UNorm8>;
+using CanonicalHDR = Texture <Pixel::RGBA_Srgb32>;
 
 struct TextureLoadOptions {
 	bool force_srgb = true;
@@ -57,40 +57,52 @@ bool is_hdr_image(const std::filesystem::path &path);
 } // namespace impl
 
 // TODO: same deal here, we can just plug Es...
-template <TextureEncoding E>
+template <Pixel P>
 struct TextureCache {
 	// TODO: read, write methods with optional lossless compression schemes (e.g. Huffman)
 	std::unordered_map <
 		std::filesystem::path,
-		Texture <E>
+		Texture <P>
 	> entries;
 
 	// TODO: TextureCacheOf <Texture <Es...>> if we go that route
 };
 
-template <TextureEncoding E>
+template <Pixel P>
 struct Texture {
-	struct Info {
+	using cache = TextureCache <P>;
+	using pixel_type = encoding_representation_t <P>;
+
+	struct Description {
 		glm::ivec2 size { 0, 0 };
 		bool is_srgb = true;
 		bool mipmapped = false;
 	};
 
-	Info info;
-	std::vector <encoding_representation_t <E>> data;
+	Description desc;
+	std::vector <pixel_type> data;
 	std::vector <size_t> mip_offsets;
 
-	template <TextureEncoding E2>
-	Texture <E2> convert() const {
-		Texture <E2> out;
-		out.info.size = info.size;
-		out.info.is_srgb = info.is_srgb;
-		out.info.mipmapped = info.mipmapped;
+	// TODO: checkerboard preset as well
+	static Texture black() {
+		Texture result;
+		result.desc.size = { 1, 1 };
+		result.desc.is_srgb = false;
+		result.data.emplace_back(pixel_type());
+		return result;
+	}
+
+	template <Pixel P2>
+	Texture <P2> convert() const {
+		Texture <P2> out;
+		out.desc.size = desc.size;
+		out.desc.is_srgb = desc.is_srgb;
+		out.desc.mipmapped = desc.mipmapped;
 		out.mip_offsets = { 0 };
 		out.data.resize(data.size());
 
 		for (size_t i = 0; i < data.size(); ++i)
-			out.data[i] = static_cast <encoding_representation_t <E2>> (data[i]);
+			out.data[i] = static_cast <Texture <P2> ::pixel_type> (data[i]);
 
 		return out;
 	}
@@ -114,25 +126,25 @@ struct Texture {
 			if (!canonical)
 				return std::unexpected(canonical.error());
 
-			if constexpr (E == TextureEncoding::RGBA_Srgb32)
+			if constexpr (P == Pixel::RGBA_Srgb32)
 				return canonical;
 			else
-				return canonical->template convert <E> ();
+				return canonical->template convert <P> ();
 		} else {
 			auto canonical = impl::load_canonical_ldr(path, options);
 			if (!canonical)
 				return std::unexpected(canonical.error());
 
-			if constexpr (E == TextureEncoding::RGBA_UNorm8)
+			if constexpr (P == Pixel::RGBA_UNorm8)
 				return canonical;
 			else
-				return canonical->template convert <E> ();
+				return canonical->template convert <P> ();
 		}
 	}
 
 	static std::expected <Texture, TextureError> load(
 		const std::filesystem::path &path,
-		TextureCache <E> &cache,
+		TextureCache <P> &cache,
 		const TextureLoadOptions &options = {}
 	) {
 		if (auto it = cache.entries.find(path); it != cache.entries.end())

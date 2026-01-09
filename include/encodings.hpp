@@ -23,18 +23,11 @@ enum class Connectivity {
 	Triangle_UInt3_32b,
 };
 
-enum class TextureEncoding {
+enum class Pixel {
 	RGBA_UNorm8,
 	RGBA_Srgb32,
 	RGBA_Sint32,
 	RGBA_Uint32,
-};
-
-struct MeshEncodings {
-	Connectivity connectivity = Connectivity::Triangle_UInt3_32b;
-	R3 positions = R3::Float3_32b;
-	S2 normals = S2::Float3_32b;
-	R2 uvs = R2::Float2_32b;
 };
 
 } // namespace mrd

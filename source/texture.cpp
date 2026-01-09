@@ -96,9 +96,9 @@ std::expected <CanonicalLDR, TextureError> load_canonical_ldr(
 	}
 
 	CanonicalLDR tex;
-	tex.info.size = { loaded->width, loaded->height };
-	tex.info.is_srgb = true;
-	tex.info.mipmapped = false;
+	tex.desc.size = { loaded->width, loaded->height };
+	tex.desc.is_srgb = true;
+	tex.desc.mipmapped = false;
 	tex.mip_offsets = { 0 };
 	tex.data.resize(loaded->data8.size() / 4);
 
@@ -131,9 +131,9 @@ std::expected <CanonicalHDR, TextureError> load_canonical_hdr(
 	}
 
 	CanonicalHDR tex;
-	tex.info.size = { loaded->width, loaded->height };
-	tex.info.is_srgb = options.force_srgb;
-	tex.info.mipmapped = false;
+	tex.desc.size = { loaded->width, loaded->height };
+	tex.desc.is_srgb = options.force_srgb;
+	tex.desc.mipmapped = false;
 	tex.mip_offsets = { 0 };
 	tex.data.resize(loaded->dataf.size() / 4);
 

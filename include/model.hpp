@@ -56,9 +56,9 @@ struct Material {
 	}
 };
 
-template <MeshEncodings F>
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
 struct Model {
-	using mesh_t = Mesh <F>;
+	using mesh_t = Mesh <Primitive, Position, Normal, UV>;
 
 	std::vector <mesh_t> meshes;
 	std::vector <Material> materials;
@@ -72,7 +72,9 @@ struct Model {
 		return result;
 	}
 
-	static Model load(const std::filesystem::path &path);
+	auto bounds() const;
+
+	static auto load(const std::filesystem::path &path);
 };
 
 } // namespace mrd

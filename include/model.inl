@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
+#include <limits>
 #include <assimp/matrix4x4.h>
 #include <assimp/vector3.h>
 #include <assimp/material.h>
@@ -12,8 +13,8 @@
 
 namespace mrd {
 
-template <MeshEncodings F>
-inline Model <F> Model <F> ::load(const std::filesystem::path &path)
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
+inline auto Model <Primitive, Position, Normal, UV> ::load(const std::filesystem::path &path)
 {
 	Model result;
 
@@ -42,12 +43,12 @@ inline Model <F> Model <F> ::load(const std::filesystem::path &path)
 
 			mesh.positions.emplace_back(v.x, v.y, v.z);
 
-			if constexpr (F.normals != S2::Disable) {
+			if constexpr (Normal != S2::Disable) {
 				auto nv = n.value_or(aiVector3D(0));
 				mesh.normals.emplace_back(nv.x, nv.y, nv.z);
 			}
 
-			if constexpr (F.uvs != R2::Disable) {
+			if constexpr (UV != R2::Disable) {
 				auto tv = t.value_or(aiVector3D(0));
 				mesh.uvs.emplace_back(tv.x, tv.y);
 			}
@@ -89,6 +90,28 @@ inline Model <F> Model <F> ::load(const std::filesystem::path &path)
 	impl::assimp_load(callbacks, path);
 
 	return result;
+}
+
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
+inline auto Model <Primitive, Position, Normal, UV> ::bounds() const
+{
+	auto minv = glm::vec3(std::numeric_limits <float> ::max());
+	auto maxv = glm::vec3(std::numeric_limits <float> ::lowest());
+
+	for (const auto &mesh : meshes) {
+		for (const auto &pos : mesh.positions) {
+			auto p = static_cast <glm::vec3> (pos);
+			minv = glm::min(minv, p);
+			maxv = glm::max(maxv, p);
+		}
+	}
+
+	if (minv.x == std::numeric_limits <float> ::max()) {
+		minv = glm::vec3(-1.0f);
+		maxv = glm::vec3(1.0f);
+	}
+
+	return std::pair(minv, maxv);
 }
 
 } // namespace mrd

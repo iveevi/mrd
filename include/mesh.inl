@@ -13,8 +13,8 @@
 
 namespace mrd {
 
-template <MeshEncodings F>
-inline void Mesh <F> ::deduplicate()
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
+inline void Mesh <Primitive, Position, Normal, UV> ::deduplicate()
 {
 	if (positions.empty())
 		return;
@@ -31,8 +31,8 @@ inline void Mesh <F> ::deduplicate()
 		positions.size(), hash, eq
 	);
 
-	constexpr bool has_normals = F.normals != S2::Disable;
-	constexpr bool has_uvs = F.uvs != R2::Disable;
+	constexpr bool has_normals = Normal != S2::Disable;
+	constexpr bool has_uvs = UV != R2::Disable;
 
 	std::vector <position_t> new_positions;
 	new_positions.reserve(positions.size());
@@ -71,9 +71,9 @@ inline void Mesh <F> ::deduplicate()
 		uvs = std::move(new_uvs);
 }
 
-template <MeshEncodings F>
-inline void Mesh <F> ::recalculate_normals()
-requires (F.normals != S2::Disable)
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
+inline void Mesh <Primitive, Position, Normal, UV> ::recalculate_normals()
+requires (Normal != S2::Disable)
 {
 	normals.assign(positions.size(), normal_t(0.0f, 0.0f, 0.0f));
 
@@ -115,8 +115,8 @@ requires (F.normals != S2::Disable)
 	}
 }
 
-template <MeshEncodings F>
-inline auto Mesh <F> ::box(glm::vec3 extent) -> Mesh <F>
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
+inline auto Mesh <Primitive, Position, Normal, UV> ::box(glm::vec3 extent)
 {
 	Mesh mesh;
 
@@ -124,9 +124,9 @@ inline auto Mesh <F> ::box(glm::vec3 extent) -> Mesh <F>
 
 	auto push = [&](glm::vec3 p, glm::vec3 n, glm::vec2 uv) {
 		mesh.positions.emplace_back(p.x, p.y, p.z);
-		if constexpr (F.normals != S2::Disable)
+		if constexpr (Normal != S2::Disable)
 			mesh.normals.emplace_back(n.x, n.y, n.z);
-		if constexpr (F.uvs != R2::Disable)
+		if constexpr (UV != R2::Disable)
 			mesh.uvs.emplace_back(uv.x, uv.y);
 	};
 
@@ -174,8 +174,8 @@ inline auto Mesh <F> ::box(glm::vec3 extent) -> Mesh <F>
 	return mesh;
 }
 
-template <MeshEncodings F>
-inline auto Mesh <F> ::uv_sphere(float radius, int rings, int segments) -> Mesh <F>
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
+inline auto Mesh <Primitive, Position, Normal, UV> ::uv_sphere(float radius, int rings, int segments)
 {
 	Mesh mesh;
 	rings = std::max(3, rings);
@@ -197,9 +197,9 @@ inline auto Mesh <F> ::uv_sphere(float radius, int rings, int segments) -> Mesh 
 			glm::vec3 p = radius * n;
 
 			mesh.positions.emplace_back(p.x, p.y, p.z);
-			if constexpr (F.normals != S2::Disable)
+			if constexpr (Normal != S2::Disable)
 				mesh.normals.emplace_back(n.x, n.y, n.z);
-			if constexpr (F.uvs != R2::Disable)
+			if constexpr (UV != R2::Disable)
 				mesh.uvs.emplace_back(u, 1.0f - v);
 		}
 	}
@@ -231,8 +231,8 @@ inline auto Mesh <F> ::uv_sphere(float radius, int rings, int segments) -> Mesh 
 	return mesh;
 }
 
-template <MeshEncodings F>
-inline auto Mesh <F> ::ico_sphere(float radius, int subdivisions) -> Mesh <F>
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
+inline auto Mesh <Primitive, Position, Normal, UV> ::ico_sphere(float radius, int subdivisions)
 {
 	Mesh mesh;
 
@@ -285,9 +285,9 @@ inline auto Mesh <F> ::ico_sphere(float radius, int subdivisions) -> Mesh <F>
 	for (const auto &v : verts) {
 		glm::vec3 p = radius * v;
 		mesh.positions.emplace_back(p.x, p.y, p.z);
-		if constexpr (F.normals != S2::Disable)
+		if constexpr (Normal != S2::Disable)
 			mesh.normals.emplace_back(v.x, v.y, v.z);
-		if constexpr (F.uvs != R2::Disable) {
+		if constexpr (UV != R2::Disable) {
 			float u = (std::atan2(v.z, v.x) / glm::two_pi <float> ()) + 0.5f;
 			float vv = 0.5f - std::asin(v.y) / glm::pi <float> ();
 			mesh.uvs.emplace_back(u, vv);
@@ -305,14 +305,14 @@ inline auto Mesh <F> ::ico_sphere(float radius, int subdivisions) -> Mesh <F>
 	return mesh;
 }
 
-template <MeshEncodings F>
-inline auto Mesh <F> ::cylinder(
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
+inline auto Mesh <Primitive, Position, Normal, UV> ::cylinder(
 	float radius,
 	float height,
 	int slices,
 	int stacks,
 	bool caps
-) -> Mesh <F>
+)
 {
 	Mesh mesh;
 	slices = std::max(3, slices);
@@ -332,9 +332,9 @@ inline auto Mesh <F> ::cylinder(
 			glm::vec3 p = { radius * c, h, radius * sng };
 
 			mesh.positions.emplace_back(p.x, p.y, p.z);
-			if constexpr (F.normals != S2::Disable)
+			if constexpr (Normal != S2::Disable)
 				mesh.normals.emplace_back(n.x, n.y, n.z);
-			if constexpr (F.uvs != R2::Disable)
+			if constexpr (UV != R2::Disable)
 				mesh.uvs.emplace_back(u, t);
 		}
 	}
@@ -368,9 +368,9 @@ inline auto Mesh <F> ::cylinder(
 			float y = top ? half_h : -half_h;
 			glm::vec3 n = { 0, top ? 1.0f : -1.0f, 0 };
 			mesh.positions.emplace_back(0, y, 0);
-			if constexpr (F.normals != S2::Disable)
+			if constexpr (Normal != S2::Disable)
 				mesh.normals.emplace_back(n.x, n.y, n.z);
-			if constexpr (F.uvs != R2::Disable)
+			if constexpr (UV != R2::Disable)
 				mesh.uvs.emplace_back(0.5f, 0.5f);
 
 			for (int s = 0; s <= slices; ++s) {
@@ -379,9 +379,9 @@ inline auto Mesh <F> ::cylinder(
 				float c = std::cos(ang), sng = std::sin(ang);
 				glm::vec3 p = { radius * c, y, radius * sng };
 				mesh.positions.emplace_back(p.x, p.y, p.z);
-				if constexpr (F.normals != S2::Disable)
+				if constexpr (Normal != S2::Disable)
 					mesh.normals.emplace_back(n.x, n.y, n.z);
-				if constexpr (F.uvs != R2::Disable)
+				if constexpr (UV != R2::Disable)
 					mesh.uvs.emplace_back(0.5f * (c + 1.0f), 0.5f * (sng + 1.0f));
 			}
 

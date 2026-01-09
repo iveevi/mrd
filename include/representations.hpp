@@ -1,7 +1,5 @@
 #pragma once
 
-#include <algorithm>
-#include <array>
 #include <bit>
 #include <cstddef>
 #include <cstdint>
@@ -25,8 +23,8 @@ struct basic_vector_space_d2 : public T {
 	template <typename U>
 	explicit operator U() const {
 		U v;
-		v.x = static_cast<decltype(v.x)>(this->x);
-		v.y = static_cast<decltype(v.y)>(this->y);
+		v.x = static_cast <decltype(v.x)> (this->x);
+		v.y = static_cast <decltype(v.y)> (this->y);
 		return v;
 	}
 };
@@ -162,10 +160,10 @@ ENCODING_REPRESENTATION(S2::Disable, std::nullptr_t);
 ENCODING_REPRESENTATION(Connectivity::Triangle_Int3_32b, int3_32b);
 ENCODING_REPRESENTATION(Connectivity::Triangle_UInt3_32b, uint3_32b);
 
-ENCODING_REPRESENTATION(TextureEncoding::RGBA_UNorm8, uint4_8b);
-ENCODING_REPRESENTATION(TextureEncoding::RGBA_Srgb32, float4_32b);
-ENCODING_REPRESENTATION(TextureEncoding::RGBA_Sint32, int4_32b);
-ENCODING_REPRESENTATION(TextureEncoding::RGBA_Uint32, uint4_32b);
+ENCODING_REPRESENTATION(Pixel::RGBA_UNorm8, uint4_8b);
+ENCODING_REPRESENTATION(Pixel::RGBA_Srgb32, float4_32b);
+ENCODING_REPRESENTATION(Pixel::RGBA_Sint32, int4_32b);
+ENCODING_REPRESENTATION(Pixel::RGBA_Uint32, uint4_32b);
 
 template <auto E>
 using encoding_representation_t = typename encoding_representation <E> ::type;
