@@ -69,4 +69,45 @@ struct Mesh {
 	static auto cylinder(float radius = 1.0f, float height = 1.0f, int slices = 32, int stacks = 1, bool caps = true);
 };
 
+template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
+inline auto merge_meshes(const std::span <const Mesh <Primitive, Position, Normal, UV>> meshes)
+	-> Mesh <Primitive, Position, Normal, UV>
+{
+	using mesh_t = Mesh <Primitive, Position, Normal, UV>;
+	mesh_t merged;
+
+	for (const auto &mesh : meshes) {
+		const uint32_t base = static_cast <uint32_t> (merged.positions.size());
+
+		for (const auto &pos : mesh.positions) {
+			auto p = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
+			auto wp = mesh.transform * p;
+			merged.positions.emplace_back(wp.x, wp.y, wp.z);
+		}
+
+		if constexpr (Normal != S2::Disable) {
+			auto nmat = glm::mat3(mesh.transform);
+			for (const auto &n : mesh.normals) {
+				auto wn = glm::normalize(nmat * glm::vec3(n.x, n.y, n.z));
+				merged.normals.emplace_back(wn.x, wn.y, wn.z);
+			}
+		}
+
+		if constexpr (UV != R2::Disable) {
+			for (const auto &t : mesh.uvs)
+				merged.uvs.emplace_back(t.x, t.y);
+		}
+
+		for (const auto &tri : mesh.primitives) {
+			merged.primitives.emplace_back(
+				tri.x + base,
+				tri.y + base,
+				tri.z + base
+			);
+		}
+	}
+
+	return merged;
+}
+
 } // namespace mrd
