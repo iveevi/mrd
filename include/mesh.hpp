@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <cstddef>
 #include <span>
 #include <type_traits>
@@ -8,106 +9,142 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
-#include <glm/gtc/constants.hpp>
 
 #include "encodings.hpp"
 #include "representations.hpp"
 
 namespace mrd {
 
-struct nil_normals_container_t {};
-struct nil_uvs_container_t {};
-
-template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
 struct Mesh {
-	using primitive_t = encoding_representation_t <Primitive>;
-	using position_t = encoding_representation_t <Position>;
-	using normal_t = encoding_representation_t <Normal>;
-	using uv_t = encoding_representation_t <UV>;
-
-	// TODO: unless its a triangle fan, etc.
-	using index_t = decltype(primitive_t {}.x);
-
-	using position_list_t = std::vector <position_t>;
-	using normal_list_t = std::conditional_t <
-		Normal == S2::Disable,
-		nil_normals_container_t,
-		std::vector <normal_t>
-	>;
-	using uv_list_t = std::conditional_t <
-		UV == R2::Disable,
-		nil_uvs_container_t,
-		std::vector <uv_t>
-	>;
-	using primitive_list_t = std::vector <primitive_t>;
+	Connectivity connectivity = Connectivity::Triangle_UInt3_32b;
+	R3 position = R3::Float3_32b;
+	S2 normal = S2::Float3_32b;
+	R2 uv = R2::Float2_32b;
 
 	glm::mat4 transform { 1.0f };
 
-	position_list_t positions;
-	[[no_unique_address]] normal_list_t normals;
-	[[no_unique_address]] uv_list_t uvs;
-	primitive_list_t primitives;
+	std::vector <std::byte> positions;
+	std::vector <std::byte> normals;
+	std::vector <std::byte> uvs;
+	std::vector <std::byte> primitives;
 
-	size_t size_bytes() const {
-		size_t result = sizeof(transform);
-		result += std::span(positions).size_bytes();
-		if constexpr (Normal != S2::Disable)
-			result += std::span(normals).size_bytes();
-		if constexpr (UV != R2::Disable)
-			result += std::span(uvs).size_bytes();
+	size_t position_stride() const { return encoding_size_bytes(position); }
+	size_t normal_stride() const { return encoding_size_bytes(normal); }
+	size_t uv_stride() const { return encoding_size_bytes(uv); }
+	size_t primitive_stride() const { return encoding_size_bytes(connectivity); }
 
-		result += std::span(primitives).size_bytes();
-		return result;
+	size_t position_count() const;
+	size_t normal_count() const;
+	size_t uv_count() const;
+	size_t primitive_count() const;
+
+	size_t size_bytes() const;
+
+	template <typename T>
+	auto positions_as() -> std::span <T>
+	{
+		static_assert(std::is_trivially_copyable_v <T>);
+		assert(position_stride() == sizeof(T));
+		assert((positions.size() % sizeof(T)) == 0);
+		return std::span <T> (
+			reinterpret_cast <T *> (positions.data()),
+			positions.size() / sizeof(T)
+		);
+	}
+
+	template <typename T>
+	auto positions_as() const -> std::span <const T>
+	{
+		static_assert(std::is_trivially_copyable_v <T>);
+		assert(position_stride() == sizeof(T));
+		assert((positions.size() % sizeof(T)) == 0);
+		return std::span <const T> (
+			reinterpret_cast <const T *> (positions.data()),
+			positions.size() / sizeof(T)
+		);
+	}
+
+	template <typename T>
+	auto normals_as() -> std::span <T>
+	{
+		static_assert(std::is_trivially_copyable_v <T>);
+		assert(normal_stride() == sizeof(T));
+		assert((normals.size() % sizeof(T)) == 0);
+		return std::span <T> (
+			reinterpret_cast <T *> (normals.data()),
+			normals.size() / sizeof(T)
+		);
+	}
+
+	template <typename T>
+	auto normals_as() const -> std::span <const T>
+	{
+		static_assert(std::is_trivially_copyable_v <T>);
+		assert(normal_stride() == sizeof(T));
+		assert((normals.size() % sizeof(T)) == 0);
+		return std::span <const T> (
+			reinterpret_cast <const T *> (normals.data()),
+			normals.size() / sizeof(T)
+		);
+	}
+
+	template <typename T>
+	auto uvs_as() -> std::span <T>
+	{
+		static_assert(std::is_trivially_copyable_v <T>);
+		assert(uv_stride() == sizeof(T));
+		assert((uvs.size() % sizeof(T)) == 0);
+		return std::span <T> (
+			reinterpret_cast <T *> (uvs.data()),
+			uvs.size() / sizeof(T)
+		);
+	}
+
+	template <typename T>
+	auto uvs_as() const -> std::span <const T>
+	{
+		static_assert(std::is_trivially_copyable_v <T>);
+		assert(uv_stride() == sizeof(T));
+		assert((uvs.size() % sizeof(T)) == 0);
+		return std::span <const T> (
+			reinterpret_cast <const T *> (uvs.data()),
+			uvs.size() / sizeof(T)
+		);
+	}
+
+	template <typename T>
+	auto primitives_as() -> std::span <T>
+	{
+		static_assert(std::is_trivially_copyable_v <T>);
+		assert(primitive_stride() == sizeof(T));
+		assert((primitives.size() % sizeof(T)) == 0);
+		return std::span <T> (
+			reinterpret_cast <T *> (primitives.data()),
+			primitives.size() / sizeof(T)
+		);
+	}
+
+	template <typename T>
+	auto primitives_as() const -> std::span <const T>
+	{
+		static_assert(std::is_trivially_copyable_v <T>);
+		assert(primitive_stride() == sizeof(T));
+		assert((primitives.size() % sizeof(T)) == 0);
+		return std::span <const T> (
+			reinterpret_cast <const T *> (primitives.data()),
+			primitives.size() / sizeof(T)
+		);
 	}
 
 	void deduplicate();
-	void recalculate_normals() requires (Normal != S2::Disable);
+	void recalculate_normals();
 
-	static auto box(glm::vec3 extent = glm::vec3(1.0f));
-	static auto uv_sphere(float radius = 1.0f, int rings = 24, int segments = 48);
-	static auto ico_sphere(float radius = 1.0f, int subdivisions = 2);
-	static auto cylinder(float radius = 1.0f, float height = 1.0f, int slices = 32, int stacks = 1, bool caps = true);
+	static auto box(glm::vec3 extent = glm::vec3(1.0f)) -> Mesh;
+	static auto uv_sphere(float radius = 1.0f, int rings = 24, int segments = 48) -> Mesh;
+	static auto ico_sphere(float radius = 1.0f, int subdivisions = 2) -> Mesh;
+	static auto cylinder(float radius = 1.0f, float height = 1.0f, int slices = 32, int stacks = 1, bool caps = true) -> Mesh;
 };
 
-template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
-inline auto merge_meshes(const std::span <const Mesh <Primitive, Position, Normal, UV>> meshes)
-	-> Mesh <Primitive, Position, Normal, UV>
-{
-	using mesh_t = Mesh <Primitive, Position, Normal, UV>;
-	mesh_t merged;
-
-	for (const auto &mesh : meshes) {
-		const uint32_t base = static_cast <uint32_t> (merged.positions.size());
-
-		for (const auto &pos : mesh.positions) {
-			auto p = glm::vec4(pos.x, pos.y, pos.z, 1.0f);
-			auto wp = mesh.transform * p;
-			merged.positions.emplace_back(wp.x, wp.y, wp.z);
-		}
-
-		if constexpr (Normal != S2::Disable) {
-			auto nmat = glm::mat3(mesh.transform);
-			for (const auto &n : mesh.normals) {
-				auto wn = glm::normalize(nmat * glm::vec3(n.x, n.y, n.z));
-				merged.normals.emplace_back(wn.x, wn.y, wn.z);
-			}
-		}
-
-		if constexpr (UV != R2::Disable) {
-			for (const auto &t : mesh.uvs)
-				merged.uvs.emplace_back(t.x, t.y);
-		}
-
-		for (const auto &tri : mesh.primitives) {
-			merged.primitives.emplace_back(
-				tri.x + base,
-				tri.y + base,
-				tri.z + base
-			);
-		}
-	}
-
-	return merged;
-}
+auto merge_meshes(const std::span <const Mesh> meshes) -> Mesh;
 
 } // namespace mrd

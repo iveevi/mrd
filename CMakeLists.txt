@@ -28,6 +28,7 @@ include_directories("${MRD_STB_PATH_RELATIVE}")
 
 # Primary library
 add_library(mrd
+	source/mesh.cpp
 	source/model.cpp
 	source/texture.cpp
 )

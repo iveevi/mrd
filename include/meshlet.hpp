@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <span>
 #include <unordered_map>
 #include <unordered_set>
@@ -40,39 +41,51 @@ struct MeshletBuildOptions {
 	MeshletBuildAlgorithm algorithm = MeshletBuildAlgorithm::eGreedyFrontier;
 	uint32_t max_vertices = 64;
 	uint32_t max_prims = 126;
-	std::function<void(size_t done, size_t total)> progress;
+	std::function <void (size_t done, size_t total)> progress;
 };
 
-template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
 inline auto build_meshlets(
-	const Mesh <Primitive, Position, Normal, UV> &mesh,
+	const Mesh &mesh,
 	const MeshletBuildOptions &options = {}
 ) -> MeshletBuild
 {
-	MeshletBuild out;
+	auto out = MeshletBuild {};
+	if (mesh.position != R3::Float3_32b)
+		return out;
+	if (mesh.connectivity != Connectivity::Triangle_UInt3_32b
+	 && mesh.connectivity != Connectivity::Triangle_Int3_32b)
+		return out;
 
 	const uint32_t max_vertices = options.max_vertices;
-	const uint32_t max_prims = std::min<uint32_t>(options.max_prims, max_vertices * 2);
+	const uint32_t max_prims = std::min <uint32_t> (options.max_prims, max_vertices * 2);
 
-	out.positions.reserve(mesh.positions.size());
-	out.triangles.reserve(mesh.primitives.size());
+	out.positions.reserve(mesh.position_count());
+	out.triangles.reserve(mesh.primitive_count());
 
-	for (const auto &p : mesh.positions)
+	for (const auto &p : mesh.positions_as <const float3_32b> ())
 		out.positions.emplace_back(p.x, p.y, p.z, 1.0f);
 
-	for (const auto &tri : mesh.primitives)
-		out.triangles.emplace_back(tri.x, tri.y, tri.z);
+	if (mesh.connectivity == Connectivity::Triangle_UInt3_32b) {
+		for (const auto &tri : mesh.primitives_as <const uint3_32b> ())
+			out.triangles.emplace_back(tri.x, tri.y, tri.z);
+	} else {
+		for (const auto &tri : mesh.primitives_as <const int3_32b> ()) {
+			if (tri.x < 0 || tri.y < 0 || tri.z < 0)
+				continue;
+			out.triangles.emplace_back(uint32_t(tri.x), uint32_t(tri.y), uint32_t(tri.z));
+		}
+	}
 
 	const size_t tri_count = out.triangles.size();
 
 	struct TriInfo {
 		glm::vec3 centroid;
 		glm::vec3 normal;
-		std::array<uint32_t, 3> v;
-		std::vector<uint32_t> neighbors;
+		std::array <uint32_t, 3> v;
+		std::vector <uint32_t> neighbors;
 	};
 
-	std::vector <TriInfo> tri_info(tri_count);
+	auto tri_info = std::vector <TriInfo> (tri_count);
 	for (size_t i = 0; i < tri_count; ++i) {
 		const auto &tri = out.triangles[i];
 		auto p0 = glm::vec3(out.positions[tri.x]);
@@ -86,7 +99,7 @@ inline auto build_meshlets(
 		tri_info[i].v = { tri.x, tri.y, tri.z };
 	}
 
-	std::unordered_map <uint64_t, uint32_t> edge_map;
+	auto edge_map = std::unordered_map <uint64_t, uint32_t> ();
 	edge_map.reserve(tri_count * 3);
 	auto edge_key = [](uint32_t a, uint32_t b) -> uint64_t {
 		uint64_t lo = std::min(a, b);
@@ -111,15 +124,15 @@ inline auto build_meshlets(
 		}
 	}
 
-	std::vector <uint32_t> local_vertices;
-	std::vector <glm::uvec3> local_tris;
-	std::unordered_map <uint32_t, uint32_t> local_map;
+	auto local_vertices = std::vector <uint32_t> ();
+	auto local_tris = std::vector <glm::uvec3> ();
+	auto local_map = std::unordered_map <uint32_t, uint32_t> ();
 
 	auto flush_meshlet = [&]() {
 		if (local_vertices.empty() || local_tris.empty())
 			return;
 
-		Meshlet meshlet {};
+		auto meshlet = Meshlet {};
 		meshlet.vertex_offset = static_cast <uint32_t> (out.meshlet_vertices.size());
 		meshlet.vertex_count = static_cast <uint32_t> (local_vertices.size());
 		meshlet.prim_offset = static_cast <uint32_t> (out.meshlet_triangles.size());
@@ -175,7 +188,7 @@ inline auto build_meshlets(
 		local_tris.push_back(local);
 	};
 
-	std::vector <uint8_t> assigned(tri_count, 0);
+	auto assigned = std::vector <uint8_t> (tri_count, 0);
 	size_t assigned_count = 0;
 
 	for (uint32_t seed = 0; seed < tri_count; ++seed) {
@@ -193,7 +206,7 @@ inline auto build_meshlets(
 		glm::vec3 centroid_acc = tri_info[seed].centroid;
 		glm::vec3 normal_acc = tri_info[seed].normal;
 
-		std::unordered_set <uint32_t> frontier;
+		auto frontier = std::unordered_set <uint32_t> ();
 		for (uint32_t n : tri_info[seed].neighbors)
 			if (!assigned[n])
 				frontier.insert(n);

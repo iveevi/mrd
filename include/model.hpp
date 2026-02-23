@@ -3,18 +3,19 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <vector>
 #include <functional>
 #include <optional>
+#include <utility>
+#include <vector>
 
+#include <glm/mat4x4.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
-#include <glm/mat4x4.hpp>
 
-#include <assimp/matrix4x4.h>
-#include <assimp/vector3.h>
 #include <assimp/material.h>
+#include <assimp/matrix4x4.h>
 #include <assimp/mesh.h>
+#include <assimp/vector3.h>
 
 #include "mesh.hpp"
 
@@ -49,32 +50,35 @@ struct Material {
 	potential_texture <glm::vec3> specular;
 	potential_texture <float> roughness;
 
-	Material() {
+	Material()
+	{
 		albedo.value = glm::vec4(1.0f);
 		specular.value = glm::vec3(1.0f);
 		roughness.value = 0.5f;
 	}
 };
 
-template <Connectivity Primitive, R3 Position, S2 Normal, R2 UV>
 struct Model {
-	using mesh_t = Mesh <Primitive, Position, Normal, UV>;
+	Connectivity connectivity = Connectivity::Triangle_UInt3_32b;
+	R3 position = R3::Float3_32b;
+	S2 normal = S2::Float3_32b;
+	R2 uv = R2::Float2_32b;
 
-	std::vector <mesh_t> meshes;
+	std::vector <Mesh> meshes;
 	std::vector <Material> materials;
 	std::vector <uint32_t> mesh_material_indices;
 	std::filesystem::path directory;
 
-	size_t size_bytes() const {
-		size_t result = 0;
-		for (const auto &mesh : meshes)
-			result += mesh.size_bytes();
-		return result;
-	}
+	size_t size_bytes() const;
+	auto bounds() const -> std::pair <glm::vec3, glm::vec3>;
 
-	auto bounds() const;
-
-	static auto load(const std::filesystem::path &path);
+	static auto load(
+		const std::filesystem::path &path,
+		Connectivity connectivity = Connectivity::Triangle_UInt3_32b,
+		R3 position = R3::Float3_32b,
+		S2 normal = S2::Float3_32b,
+		R2 uv = R2::Float2_32b
+	) -> Model;
 };
 
 } // namespace mrd
